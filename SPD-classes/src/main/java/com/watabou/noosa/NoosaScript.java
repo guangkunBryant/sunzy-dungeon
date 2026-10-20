@@ -44,6 +44,8 @@ public class NoosaScript extends Script {
 	public Attribute aUV;
 	
 	private Camera lastCamera;
+	//P10(web): scratch ELEMENT_ARRAY_BUFFER for client-side index arrays (see drawElements)
+	private static int webScratchIndexBuffer = 0;
 	
 	public NoosaScript() {
 
@@ -80,6 +82,24 @@ public class NoosaScript extends Script {
 
 		((Buffer)vertices).position( 2 );
 		aUV.vertexPointer( 2, 4, vertices );
+
+		//P10(web): WebGL (GLES2) cannot read client-side index arrays either. The original
+		// path releases Quad's index VBO and calls glDrawElements with a client ShortBuffer,
+		// which the gdx-teavm backend turns into gl.drawElements against an unbound
+		// ELEMENT_ARRAY_BUFFER, generating GL errors on every draw (Chromium eventually
+		// reports "WebGL: too many errors"). On web we upload the caller's indices into a
+		// scratch ELEMENT_ARRAY_BUFFER and draw with a byte-offset instead.
+		// Desktop/Android keep the original path.
+		if (DeviceCompat.isWeb()) {
+			if (webScratchIndexBuffer == 0) {
+				webScratchIndexBuffer = Gdx.gl20.glGenBuffer();
+			}
+			Gdx.gl20.glBindBuffer( Gdx.gl20.GL_ELEMENT_ARRAY_BUFFER, webScratchIndexBuffer );
+			Gdx.gl20.glBufferData( Gdx.gl20.GL_ELEMENT_ARRAY_BUFFER, indices.remaining() * 2, indices, Gdx.gl20.GL_DYNAMIC_DRAW );
+			Gdx.gl20.glDrawElements( Gdx.gl20.GL_TRIANGLES, size, Gdx.gl20.GL_UNSIGNED_SHORT, 0 );
+			Quad.bindIndices();
+			return;
+		}
 
 		Quad.releaseIndices();
 		Gdx.gl20.glDrawElements( Gdx.gl20.GL_TRIANGLES, size, Gdx.gl20.GL_UNSIGNED_SHORT, indices );

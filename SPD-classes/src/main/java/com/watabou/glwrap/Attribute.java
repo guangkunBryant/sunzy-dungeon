@@ -22,13 +22,23 @@
 package com.watabou.glwrap;
 
 import com.badlogic.gdx.Gdx;
+import com.watabou.utils.DeviceCompat;
 
+import java.nio.Buffer;
 import java.nio.FloatBuffer;
 
 public class Attribute {
 
 	private int location;
-	
+	//P10(web): WebGL (GLES2) cannot read client-side vertex arrays, so the FloatBuffer
+	// overload of glVertexAttribPointer is unimplemented in the gdx-teavm backend and
+	// throws GdxRuntimeException. This broke rendering of any visual that draws through
+	// NoosaScript.drawElements/drawQuad(FloatBuffer) (e.g. effects.Flare, effects.CircleArc
+	// in the HUD, visible immediately after restoring a save). On web we instead upload the
+	// client buffer into a scratch VBO and use the buffer-offset glVertexAttribPointer
+	// overload, which the backend does implement. Desktop/Android keep the original path.
+	private static int webScratchBuffer = 0;
+
 	public Attribute( int location ) {
 		this.location = location;
 	}
@@ -46,6 +56,17 @@ public class Attribute {
 	}
 	
 	public void vertexPointer( int size, int stride, FloatBuffer ptr ) {
+		if (DeviceCompat.isWeb()) {
+			if (webScratchBuffer == 0) {
+				webScratchBuffer = Gdx.gl20.glGenBuffer();
+			}
+			int offsetFloats = ((Buffer)ptr).position();
+			((Buffer)ptr).position(0);
+			Gdx.gl20.glBindBuffer( Gdx.gl20.GL_ARRAY_BUFFER, webScratchBuffer );
+			Gdx.gl20.glBufferData( Gdx.gl20.GL_ARRAY_BUFFER, ptr.remaining() * 4, ptr, Gdx.gl20.GL_DYNAMIC_DRAW );
+			Gdx.gl20.glVertexAttribPointer( location, size, Gdx.gl.GL_FLOAT, false, stride * 4, offsetFloats * 4 );
+			return;
+		}
 		Gdx.gl.glVertexAttribPointer( location, size, Gdx.gl.GL_FLOAT, false, stride * 4, ptr );
 	}
 
