@@ -32,6 +32,10 @@ public class WebLauncher {
 		config.width = 0;
 		config.height = 0;
 		config.storagePrefix = "shattered-pixel-dungeon";
+		// localStoragePrefix is the IndexedDB database name for Gdx.files.local() data
+		// (backend-web 1.5.5: LocalDBStorage opens DB named by this field). Set it so
+		// save data is isolated per-app; storagePrefix only namespaces Preferences.
+		config.localStoragePrefix = "shattered-pixel-dungeon";
 		config.showDownloadLogs = true;
 		config.preloadListener = assetLoader -> assetLoader.loadScript("freetype.js");
 
