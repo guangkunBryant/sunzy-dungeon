@@ -63,6 +63,41 @@ for (const a of actions) {
   } else if (op === 'reload') {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('canvas', { timeout: 90000 });
+  } else if (op === 'eval') {
+    // eval: dump indexedDB database names + record keys for save diagnosis
+    const out = await page.evaluate(async () => {
+      const dbs = await indexedDB.databases();
+      const result = [];
+      for (const d of dbs) {
+        const entry = { name: d.name, version: d.version, stores: {} };
+        try {
+          const db = await new Promise((res, rej) => {
+            const rq = indexedDB.open(d.name);
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
+          });
+          for (const sn of db.objectStoreNames) {
+            const keys = await new Promise((res, rej) => {
+              const tx = db.transaction(sn, 'readonly');
+              const rq = tx.objectStore(sn).getAllKeys();
+              rq.onsuccess = () => res(rq.result);
+              rq.onerror = () => rej(rq.error);
+            });
+            entry.stores[sn] = keys;
+          }
+          db.close();
+        } catch (e) { entry.error = String(e); }
+        result.push(entry);
+      }
+      return result;
+    });
+    console.log('--- indexedDB dump ---');
+    for (const db of out) {
+      console.log(`db: ${db.name} v${db.version}${db.error ? ' ERROR: ' + db.error : ''}`);
+      for (const [sn, keys] of Object.entries(db.stores ?? {})) {
+        console.log(`  store "${sn}": ${keys.length} keys -> ${JSON.stringify(keys)}`);
+      }
+    }
   }
 }
 
@@ -88,8 +123,15 @@ const traces = allMsgs.filter((m) => /TRACE/i.test(m));
 for (const m of traces) console.log(m);
 console.log(`(trace lines: ${traces.length})`);
 console.log('--- fatal/error search ---');
-const fatal = allMsgs.filter((m) => /Fatal|Exception|Error|group/i.test(m) && !/error: 0/i.test(m));
-for (const m of fatal) console.log(m);
-console.log(`(total messages: ${allMsgs.length}, matches: ${fatal.length})`);
+const fatalIdx = [];
+allMsgs.forEach((m, i) => { if (/Fatal|Exception|Error|group/i.test(m)) fatalIdx.push(i); });
+for (const i of fatalIdx) {
+  console.log(`>>> match at #${i}: ${allMsgs[i].slice(0, 200)}`);
+  for (let j = i + 1; j < Math.min(allMsgs.length, i + 25); j++) {
+    if (/startGroup|endGroup/.test(allMsgs[j]) && j !== i) break;
+    console.log(`    stack: ${allMsgs[j].slice(0, 250)}`);
+  }
+}
+console.log(`(total messages: ${allMsgs.length}, matches: ${fatalIdx.length})`);
 await browser.close();
 server.close();
