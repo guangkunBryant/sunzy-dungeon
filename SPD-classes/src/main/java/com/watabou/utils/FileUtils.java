@@ -38,10 +38,15 @@ public class FileUtils {
 	
 	private static Files.FileType defaultFileType = null;
 	private static String defaultPath = "";
+	private static boolean bundleCompression = true;
 	
 	public static void setDefaultFileProperties( Files.FileType type, String path ){
 		defaultFileType = type;
 		defaultPath = path;
+	}
+
+	public static void setBundleCompression( boolean compressed ){
+		bundleCompression = compressed;
 	}
 	
 	public static FileHandle getFileHandle( String name ){
@@ -219,7 +224,7 @@ public class FileUtils {
 	}
 	
 	private static void bundleToStream( OutputStream output, Bundle bundle ) throws IOException{
-		Bundle.write( bundle, output );
+		Bundle.write( bundle, output, bundleCompression );
 		output.close();
 	}
 
