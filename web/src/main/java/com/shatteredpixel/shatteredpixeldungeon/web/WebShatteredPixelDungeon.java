@@ -51,6 +51,7 @@ public class WebShatteredPixelDungeon extends ShatteredPixelDungeon {
 
 		super.create();
 		reflectionSelfTest();
+		filesystemSelfTest();
 	}
 
 	@Override
@@ -97,6 +98,35 @@ public class WebShatteredPixelDungeon extends ShatteredPixelDungeon {
 
 			if (roundTripped == null || roundTripped.centerCell != original.centerCell) {
 				throw new RuntimeException("web reflection self-test round-trip failed");
+			}
+		} catch (Exception e) {
+			reportException(e);
+		}
+	}
+
+	private void filesystemSelfTest() {
+		try {
+			String dirName = "web-self-test/";
+			if (FileUtils.dirExists(dirName)) {
+				FileUtils.deleteDir(dirName);
+			}
+
+			FileUtils.getFileHandle(dirName + "probe.dat").writeString("probe", false);
+			if (!FileUtils.getFileHandle(dirName + "probe.dat").readString().equals("probe")) {
+				throw new RuntimeException("web filesystem self-test write/read failed");
+			}
+
+			FileUtils.getFileHandle(dirName + "probe.dat.spdtmp").writeString("moved", false);
+			FileUtils.getFileHandle(dirName + "probe.dat.spdtmp").moveTo(
+					FileUtils.getFileHandle(dirName + "probe.dat"));
+			if (!FileUtils.getFileHandle(dirName + "probe.dat").readString().equals("moved")) {
+				throw new RuntimeException("web filesystem self-test moveTo failed");
+			}
+			if (FileUtils.filesInDir(dirName).isEmpty()) {
+				throw new RuntimeException("web filesystem self-test list failed");
+			}
+			if (!FileUtils.deleteDir(dirName)) {
+				throw new RuntimeException("web filesystem self-test deleteDirectory failed");
 			}
 		} catch (Exception e) {
 			reportException(e);
