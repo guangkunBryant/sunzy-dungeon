@@ -410,38 +410,27 @@ public class InterlevelScene extends PixelScene {
 		phase = Phase.FADE_IN;
 		timeLeft = fadeTime;
 		
-		if (thread == null) {
+		if (DeviceCompat.isWeb()) {
+			// TeaVM threads are cooperative rather than preemptive. Starting the
+			// level-generation thread here can leave the main render fiber parked
+			// with no later wakeup. Run loading inline on the render thread; the
+			// browser briefly stalls but then resumes with the new level ready.
+			try {
+				loadLevel();
+			} catch (Exception e) {
+				error = e;
+			}
+			if (error == null) {
+				afterLoading();
+			}
+		} else {
 			thread = new Thread() {
 				@Override
 				public void run() {
 					
 					try {
 
-						Actor.fixTime();
-
-						switch (mode) {
-							case DESCEND:
-								descend();
-								break;
-							case ASCEND:
-								ascend();
-								break;
-							case CONTINUE:
-								restore();
-								break;
-							case RESURRECT:
-								resurrect();
-								break;
-							case RETURN:
-								returnTo();
-								break;
-							case FALL:
-								fall();
-								break;
-							case RESET:
-								reset();
-								break;
-						}
+						loadLevel();
 						
 					} catch (Exception e) {
 						
@@ -459,6 +448,34 @@ public class InterlevelScene extends PixelScene {
 			thread.start();
 		}
 		waitingTime = 0f;
+	}
+
+	private void loadLevel() throws Exception {
+		Actor.fixTime();
+
+		switch (mode) {
+			case DESCEND:
+				descend();
+				break;
+			case ASCEND:
+				ascend();
+				break;
+			case CONTINUE:
+				restore();
+				break;
+			case RESURRECT:
+				resurrect();
+				break;
+			case RETURN:
+				returnTo();
+				break;
+			case FALL:
+				fall();
+				break;
+			case RESET:
+				reset();
+				break;
+		}
 	}
 
 	private int dots = 0;
