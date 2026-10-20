@@ -1,0 +1,21 @@
+[
+  ["absClick", 360, 833],
+  ["wait", 4000],
+  ["absClick", 185, 1240],
+  ["wait", 2000],
+  ["absClick", 360, 1215],
+  ["wait", 2500],
+  ["absClick", 360, 748],
+  ["wait", 3000],
+  ["shot", "m0-arrival"],
+  ["absClick", 340, 690],
+  ["wait", 1500],
+  ["shot", "m1-walking"],
+  ["wait", 1500],
+  ["shot", "m2-moved"],
+  ["absClick", 420, 690],
+  ["wait", 1500],
+  ["shot", "m3-walking2"],
+  ["wait", 2000],
+  ["shot", "m4-moved2"]
+]
