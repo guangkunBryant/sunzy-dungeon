@@ -86,6 +86,22 @@ public class NoosaScript extends Script {
 		Quad.bindIndices();
 	}
 
+	public void drawTriangles( Vertexbuffer buffer, int size ) {
+		if (size == 0) {
+			return;
+		}
+
+		buffer.updateGLData();
+		buffer.bind();
+
+		aXY.vertexBuffer( 2, 4, 0 );
+		aUV.vertexBuffer( 2, 4, 2 );
+
+		buffer.release();
+
+		Gdx.gl20.glDrawArrays( Gdx.gl20.GL_TRIANGLES, 0, size );
+	}
+
 	public void drawQuad( FloatBuffer vertices ) {
 
 		((Buffer)vertices).position( 0 );

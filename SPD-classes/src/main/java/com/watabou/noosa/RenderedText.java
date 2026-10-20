@@ -32,6 +32,8 @@ import com.badlogic.gdx.math.Affine2;
 import com.badlogic.gdx.math.Matrix4;
 import com.watabou.glwrap.Matrix;
 import com.watabou.glwrap.Quad;
+import com.watabou.glwrap.Vertexbuffer;
+import com.watabou.utils.DeviceCompat;
 
 import java.nio.Buffer;
 import java.nio.FloatBuffer;
@@ -79,7 +81,7 @@ public class RenderedText extends Image {
 	
 	private synchronized void measure(){
 		
-		if (Thread.currentThread().getName().equals("SHPD Actor Thread")){
+		if (!DeviceCompat.isWeb() && Thread.currentThread().getName().equals("SHPD Actor Thread")){
 			throw new RuntimeException("Text measured from the actor thread!");
 		}
 		
@@ -159,10 +161,18 @@ public class RenderedText extends Image {
 		private static RenderedText textBeingRendered = null;
 		private static float[] vertices = new float[16];
 		private static HashMap<Integer, FloatBuffer> buffers = new HashMap<>();
+		private static HashMap<Integer, Vertexbuffer> vertexBuffers = new HashMap<>();
+		private static Scene bufferedScene = null;
 
 		@Override
 		public void draw(Texture texture, float[] spriteVertices, int offset, int count) {
 			Visual v = textBeingRendered;
+
+			// Scene switches clear every GPU buffer, so discard the matching cache.
+			if (bufferedScene != Game.scene()) {
+				vertexBuffers.clear();
+				bufferedScene = Game.scene();
+			}
 			
 			FloatBuffer toOpenGL;
 			if (buffers.containsKey(count/20)){
@@ -204,6 +214,14 @@ public class RenderedText extends Image {
 			}
 
 			((Buffer)toOpenGL).position(0);
+
+			Vertexbuffer vertexBuffer = vertexBuffers.get(count/20);
+			if (vertexBuffer == null) {
+				vertexBuffer = new Vertexbuffer(toOpenGL);
+				vertexBuffers.put(count/20, vertexBuffer);
+			} else {
+				vertexBuffer.updateVertices(toOpenGL);
+			}
 			
 			NoosaScript script = NoosaScript.get();
 			
@@ -217,7 +235,7 @@ public class RenderedText extends Image {
 					v.rm, v.gm, v.bm, v.am,
 					v.ra, v.ga, v.ba, v.aa );
 			
-			script.drawQuadSet( toOpenGL, count/20 );
+			script.drawQuadSet( vertexBuffer, count/20, 0 );
 		}
 		
 		//none of these functions are needed, so they are stubbed

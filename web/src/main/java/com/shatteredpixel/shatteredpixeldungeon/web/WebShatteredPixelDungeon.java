@@ -17,11 +17,15 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
+import com.shatteredpixel.shatteredpixeldungeon.levels.features.LevelTransition;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.watabou.noosa.Game;
+import com.watabou.utils.Bundle;
 import com.watabou.utils.FileUtils;
 import com.watabou.utils.PlatformSupport;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
@@ -46,6 +50,7 @@ public class WebShatteredPixelDungeon extends ShatteredPixelDungeon {
 		}
 
 		super.create();
+		reflectionSelfTest();
 	}
 
 	@Override
@@ -74,5 +79,27 @@ public class WebShatteredPixelDungeon extends ShatteredPixelDungeon {
 			}
 		}
 		return false;
+	}
+
+	private void reflectionSelfTest() {
+		try {
+			LevelTransition original = new LevelTransition();
+			original.centerCell = 42;
+			original.type = LevelTransition.Type.SURFACE;
+
+			Bundle bundle = new Bundle();
+			bundle.put("probe", original);
+
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			Bundle.write(bundle, bytes, false);
+			Bundle restored = Bundle.read(new ByteArrayInputStream(bytes.toByteArray()));
+			LevelTransition roundTripped = (LevelTransition) restored.get("probe");
+
+			if (roundTripped == null || roundTripped.centerCell != original.centerCell) {
+				throw new RuntimeException("web reflection self-test round-trip failed");
+			}
+		} catch (Exception e) {
+			reportException(e);
+		}
 	}
 }

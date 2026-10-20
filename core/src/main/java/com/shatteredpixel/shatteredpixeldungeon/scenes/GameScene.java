@@ -126,6 +126,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndUpgrade;
+import com.watabou.utils.DeviceCompat;
 import com.watabou.gltextures.TextureCache;
 import com.watabou.glwrap.Blending;
 import com.watabou.input.ControllerHandler;
@@ -799,7 +800,9 @@ public class GameScene extends PixelScene {
 	public void destroy() {
 		
 		//tell the actor thread to finish, then wait for it to complete any actions it may be doing.
-		if (!waitForActorThread( 4500, true )){
+		if (DeviceCompat.isWeb()) {
+			endActorThread();
+		} else if (!waitForActorThread( 4500, true )){
 			Throwable t = new Throwable();
 			t.setStackTrace(actorThread.getStackTrace());
 			throw new RuntimeException("timeout waiting for actor thread! ", t);
@@ -817,7 +820,15 @@ public class GameScene extends PixelScene {
 	public static void endActorThread(){
 		if (actorThread != null && actorThread.isAlive()){
 			Actor.keepActorThreadAlive = false;
-			actorThread.interrupt();
+			if (DeviceCompat.isWeb()) {
+				// TeaVM can report a JavaError when interrupting a thread during
+				// monitor unwinding. Wake the actor thread instead.
+				synchronized (actorThread) {
+					actorThread.notify();
+				}
+			} else {
+				actorThread.interrupt();
+			}
 		}
 	}
 
@@ -839,7 +850,11 @@ public class GameScene extends PixelScene {
 	@Override
 	public synchronized void onPause() {
 		try {
-			if (!Dungeon.hero.ready) waitForActorThread(500, false);
+			if (DeviceCompat.isWeb() && Actor.processing()) {
+				return;
+			} else if (!Dungeon.hero.ready) {
+				waitForActorThread(500, false);
+			}
 			Dungeon.saveAll();
 			Badges.saveGlobal();
 			Journal.saveGlobal();
