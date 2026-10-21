@@ -1,3 +1,10 @@
 node_modules/
 screenshots/
 .profile/
+live.out
+live.cmd
+*.json.bak
+explore.json
+plan.json
+live-setup.json
+

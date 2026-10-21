@@ -156,7 +156,7 @@ async function runActions(list) {
         } catch (e) { result.push({ dbError: String(e) }); }
         return result;
       }, withMap);
-      const line = 'savepeek: ' + JSON.stringify(out).slice(0, 6000);
+      const line = 'savepeek: ' + JSON.stringify(out).slice(0, 20000);
       console.log(line);
       liveOutputs.push(line);
     } else if (op === 'eval') {
@@ -215,6 +215,8 @@ function report(cursor) {
 }
 
 if (liveMode) {
+  // Run the setup action list first (documented behavior), then enter the loop.
+  await runActions(actions);
   console.log('[live] setup done, entering live loop (poll ./live.cmd)');
   let cursor = allMsgs.length;
   for (;;) {
@@ -237,6 +239,8 @@ if (liveMode) {
     }
   }
 } else {
+  // Run the action list from the CLI/file, then report.
+  await runActions(actions);
   console.log(`errors: ${errors.length}`);
   for (const e of errors.slice(0, 10)) console.log(`  ${e}`);
   // canvas freeze detection: hash canvas pixels twice, 1s apart

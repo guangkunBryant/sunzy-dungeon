@@ -71,8 +71,11 @@ while (rounds < MAX_ROUNDS) {
   if (pos.x === tx && pos.y === ty) { console.log('ARRIVED'); process.exit(0); }
 
   // try sprite-anchor click, then perturbed variants until hero moves
+  // empirically: the settled hero sprite's visual center sits at (358,609),
+  // but its true tile center maps to (358,641) (sprite drawn 32px above anchor)
   const variants = [
-    [358 + (tx - pos.x) * 16, 609 + (ty - pos.y) * 16], // settled camera puts hero sprite at (358,609)
+    [358 + (tx - pos.x) * 16, 641 + (ty - pos.y) * 16],
+    [358 + (tx - pos.x) * 16, 609 + (ty - pos.y) * 16],
     [360, 640], // legacy center model
   ].filter((v, i, a) => a.findIndex((u) => u[0] === v[0] && u[1] === v[1]) === i);
 
@@ -81,16 +84,26 @@ while (rounds < MAX_ROUNDS) {
     const scx = Math.max(5, Math.min(715, Math.round(cx)));
     const scy = Math.max(5, Math.min(1275, Math.round(cy)));
     console.log(`  click (${scx},${scy})`);
-    await runBatch([['absClick', scx, scy], ['wait', 15000], ['savepeek']]);
-    const p2 = parseLive();
-    const w = (p2.lv ?? {}).w ?? widthRef.w;
-    const x2 = p2.g.heroPos % w, y2 = Math.floor(p2.g.heroPos / w);
-    console.log(`  after: (${x2},${y2})`);
-    if (x2 !== pos.x || y2 !== pos.y) {
-      moved = true;
-      if (x2 === tx && y2 === ty) { console.log('ARRIVED'); process.exit(0); }
-      break;
+    // long walks freeze the autosave (saves only when hero.ready): poll until the save moves
+    await runBatch([['absClick', scx, scy],
+      ['wait', 8000], ['savepeek'], ['wait', 8000], ['savepeek'],
+      ['wait', 8000], ['savepeek'], ['wait', 8000], ['savepeek'],
+      ['wait', 8000], ['savepeek'], ['wait', 8000], ['savepeek']]);
+    let p2 = null;
+    for (let k = 0; k < 6; k++) {
+      const cand = parseLive();
+      if (cand) {
+        const w = (cand.lv ?? {}).w ?? widthRef.w;
+        const x2 = cand.g.heroPos % w, y2 = Math.floor(cand.g.heroPos / w);
+        if (x2 !== pos.x || y2 !== pos.y) { p2 = { x2, y2, w }; break; }
+      }
+      await runBatch([['wait', 5000], ['savepeek']]);
     }
+    if (!p2) continue;
+    console.log(`  after: (${p2.x2},${p2.y2})`);
+    moved = true;
+    if (p2.x2 === tx && p2.y2 === ty) { console.log('ARRIVED'); process.exit(0); }
+    break;
   }
   if (!moved) console.log('  no movement this round');
 }
