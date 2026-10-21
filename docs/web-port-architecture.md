@@ -333,6 +333,26 @@ Serve `web/build/dist/webapp` (static), then drive headless Chromium (`chromium.
 | **M4 — save/load** | Save slot detected on title; refresh → continue into explored dungeon; `.spdtmp` recovery simulated (kill page mid-write); intro-recovery works; settings persist across reload |
 | **M5 — full-run validation** | Scripted deep run: descend through all 5 regions (or as far as automation allows), boss floors, shop, journal, rankings write; memory stable (512 MB heap OK); soak test 30+ min; mobile-browser touch spot-check |
 
+### 5.4 Test record (headless Chromium, live harness `tests/step.mjs --live`)
+
+| Milestone | Status | Evidence |
+|---|---|---|
+| M0 build+boot | **PASS** | webapp boots, manifest + FreeType load, backend-web FS ops verified, errors=0 (one benign 404 from an injected probe) |
+| M1 title+font | **PASS** | Title/hero-select render, glyph metrics correct; Bundle reflection self-test passed at startup |
+| M2 gameplay render | **PASS** | Floor tiles, sprites, HUD render; Flare/CircleArc upstream paths kept (no fork rewrite needed) |
+| M3 input+combat | **PASS** | WASD movement, BFS-assisted walk, melee vs rat: XP + drop + level-up; key events occasionally double-fire (harness-level observation, not a port bug) |
+| M4 save/load | **PASS** | New game, death → New Game, page reload → Continue restores depth/fog/hero; `Continue` from title verified twice; intro skip persisted |
+| M5 multi-floor | **PASS (partial)** | Descend depth 1→2→3 via exit-tile click (`cell==pos` → `LvlTransition`); per-depth saves (`depth1/2/3.dat`) coexist; "return to floor N" round-trip verified; depth-2 secret doors revealed via toolbar search (`search(true)` 必中) |
+
+**Harness ground rules learned (keep for future runs):**
+
+- P10 autosave only flushes when `hero.ready` — a savepeek taken while the hero is walking/auto-traveling returns a frozen snapshot. Trustworthy read = wait ≥10 s after settle, or poll until `heroPos` changes (nav-to.mjs does this).
+- Click→tile mapping (settled camera): the hero sprite's visual center sits at screen (358,609) but the true tile center maps to (358,641); tile = hero_tile + (round((sx−358)/16), round((sy−641)/16)).
+- A single tap auto-travels the full path to the tapped cell, but **aborts when an enemy becomes visible**, and taps are dropped while the hero is mid-turn (adjacent hunting mob ⇒ click-looking "dead"). Clicking an **unexplored (fog) tile does nothing** — travel must hop through explored cells or use WASD.
+- Clicking a distant enemy-adjacent cell with enemies visible = Move; only `cell==pos` (or no visible enemies) on an exit/entrance tile creates the transition. Keyboard stepping onto stairs does **not** descend.
+- After a descend succeeds, stop clicking: the follow-up click lands in the new scene near its entrance and can bounce the hero back (`LvlTransition` to the previous floor).
+- Escape in GameScene opens WndGame → risk of chaining back to title; avoid. Toolbar search button (57,1252) ×2 = intentional search (always reveals an adjacent secret).
+
 ---
 
 ## 6. Risk register (top 5, ranked)
