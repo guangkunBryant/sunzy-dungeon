@@ -1,0 +1,12 @@
+[
+  ["wait", 15000],
+  ["shot", "r0-title"],
+  ["absClick", 360, 629],
+  ["wait", 3000],
+  ["absClick", 360, 615],
+  ["wait", 1500],
+  ["absClick", 300, 745],
+  ["wait", 6000],
+  ["shot", "r1-resumed"],
+  ["savepeek", "map"]
+]

@@ -1,0 +1,20 @@
+[
+  ["evaljs", "location.href = 'http://127.0.0.1:8083/nope404'"],
+  ["wait", 2000],
+  ["evaljs", "(() => { localStorage.setItem('pref:shattered-pixel-dungeon:settings.xml:introb','false'); return localStorage.getItem('pref:shattered-pixel-dungeon:settings.xml:introb'); })()"],
+  ["evaljs", "location.href = 'http://127.0.0.1:8083/'"],
+  ["wait", 15000],
+  ["shot", "g0-title"],
+  ["absClick", 360, 629],
+  ["wait", 3000],
+  ["shot", "g0-start-scene"],
+  ["absClick", 360, 615],
+  ["wait", 2000],
+  ["shot", "g0-hero-select"],
+  ["absClick", 185, 1240],
+  ["wait", 800],
+  ["absClick", 360, 1215],
+  ["wait", 7000],
+  ["shot", "g1-newgame"],
+  ["savepeek", "map"]
+]
