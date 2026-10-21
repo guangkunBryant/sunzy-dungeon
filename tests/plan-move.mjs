@@ -12,8 +12,8 @@ const live = JSON.parse(raw);
 const line = (live.outputs ?? []).find((o) => o.startsWith('savepeek:'));
 if (!line) { console.log('no savepeek output'); process.exit(1); }
 const data = JSON.parse(line.slice('savepeek:'.length));
-const lv = data.find((e) => e.file === 'depth1');
 const hero = data.find((e) => e.depth !== undefined);
+const lv = data.find((e) => e.file === `depth${hero.depth}`);
 const { w, map } = lv;
 const start = hero.heroPos;
 const target = ty * w + tx;
@@ -62,7 +62,7 @@ actions.push(['absClick', 690, 60]);
 actions.push(['wait', 400]);
 for (const k of keys) {
   actions.push(['key', k]);
-  actions.push(['wait', 700]);
+  actions.push(['wait', 1000]);
 }
 actions.push(['wait', 1200]);
 actions.push(['savepeek', 'map']);
