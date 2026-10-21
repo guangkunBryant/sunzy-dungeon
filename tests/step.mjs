@@ -10,7 +10,10 @@ import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
 
 const DIST = join(process.cwd(), '..', 'web', 'build', 'dist', 'webapp');
-const PORT = 8083;
+const PORT = Number(process.env.SPD_TEST_PORT ?? 8083);
+// per-session live protocol files (env-overridable so two sessions can coexist)
+const LIVE_CMD = process.env.SPD_TEST_LIVE_CMD ?? 'live.cmd';
+const LIVE_OUT = process.env.SPD_TEST_LIVE_OUT ?? 'live.out';
 const liveMode = process.argv[2] === '--live';
 const actionsFile = liveMode ? process.argv[3] : (process.argv[2] ?? 'actions.json');
 const actions = JSON.parse(await readFile(join(process.cwd(), actionsFile), 'utf8'));
@@ -220,22 +223,22 @@ if (liveMode) {
   console.log('[live] setup done, entering live loop (poll ./live.cmd)');
   let cursor = allMsgs.length;
   for (;;) {
-    if (!(await fileExists('live.cmd'))) { await page.waitForTimeout(300); continue; }
+    if (!(await fileExists(LIVE_CMD))) { await page.waitForTimeout(300); continue; }
     let cmds, out;
     try {
-      cmds = JSON.parse(await readFile('live.cmd', 'utf8'));
-      await unlink('live.cmd');
+      cmds = JSON.parse(await readFile(LIVE_CMD, 'utf8'));
+      await unlink(LIVE_CMD);
       liveOutputs = [];
       const quit = cmds.some((c) => c[0] === 'quit');
       await runActions(cmds);
       out = { ok: true, quit, outputs: liveOutputs, ...report(cursor) };
       cursor = allMsgs.length;
-      await writeFile('live.out', JSON.stringify(out, null, 1));
+      await writeFile(LIVE_OUT, JSON.stringify(out, null, 1));
       if (quit) break;
     } catch (e) {
       out = { ok: false, error: String(e && e.stack || e), outputs: liveOutputs, ...report(cursor) };
       cursor = allMsgs.length;
-      await writeFile('live.out', JSON.stringify(out, null, 1));
+      await writeFile(LIVE_OUT, JSON.stringify(out, null, 1));
     }
   }
 } else {

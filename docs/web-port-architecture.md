@@ -384,3 +384,28 @@ Everything marked **[PROVEN]** was verified from the glassesmonkey repository (c
 - Upstream v4.0.2 sparse clone: `%TEMP%\opencode\spd2` (SPD-classes/src, core/src, desktop/src)
 - Fork clone: `%TEMP%\opencode\spdw` (web, SPD-classes/src, core/src)
 - gdx-teavm docs (master): https://github.com/xpenatan/gdx-teavm/blob/master/docs/usage.md â€” **note**: reflects 1.6+ plugin; 1.5.5 = manual builder only
+
+### 5.5 Incident: "walked areas render as water" (user report, 2026-10-22)
+
+Investigation outcome ¡ª **no data or rendering defect reproduced**:
+
+- Saved `Level.map` histograms are identical before/after a 17-tile walk (BFS route to (30,34),
+  depth 3): `{0:110,1:169,2:20,4:1363,...}` cell-for-cell. Walking does not mutate terrain.
+- Teal regions on screenshots match saved terrain exactly: CHASM cross + wooden walkway
+  (`EMPTY_SP`) + `WATER` pools are **legitimate v4.0.2 bridge/connection rooms**; CHASM can
+  generate on sewers floors via bridge rooms (grep: painters set `Terrain.CHASM` unconditionally).
+- Reload A/B (same corridor, before vs after `location.reload()` + resume): renderings identical
+  and consistent with save data. The original suspect session died with a server restart, so a
+  transient GPU/buffer corruption in *that* instance cannot be fully excluded.
+- Follow-up if user reproduces: F5 first (rebuilds tilemap buffers); if it persists, send a
+  screenshot + depth. Fresh-profile StartScene hero pane rendered black once (unreproduced,
+  no console errors) ¡ª watch for recurrence.
+
+### 5.6 Rebrand (reskin stage 1, 2026-10-22)
+
+- `core/assets/interfaces/banners.png`: TITLE_PORT / TITLE_LAND text regions redrawn as
+  pixel-art "SUNZY" (gold gradient + dark outline); glow regions re-synced (green shimmer copy);
+  all other sprites untouched. Generator: `tests/rebrand-banner.mjs` (backup: banners-orig-backup.png).
+- `BuildWeb.setHtmlTitle("sunzy")` -> browser tab title.
+- Storage keys (IndexedDB `shattered-pixel-dungeon`, prefs) deliberately unchanged to keep saves.
+- GPL-3.0 compliance: Credits/About scenes and license headers preserved.

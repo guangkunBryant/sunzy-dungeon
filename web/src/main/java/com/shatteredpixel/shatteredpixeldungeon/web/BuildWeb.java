@@ -46,7 +46,7 @@ public class BuildWeb {
 		boolean runAfterBuild = args.length > 0 && "run".equals(args[0]);
 
 		WebBackend backend = new WebBackend()
-				.setHtmlTitle("Shattered Pixel Dungeon")
+				.setHtmlTitle("sunzy")
 				.setHtmlWidth(720)
 				.setHtmlHeight(1280)
 				.setJettyPort(8080)

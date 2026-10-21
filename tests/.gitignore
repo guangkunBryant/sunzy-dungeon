@@ -8,3 +8,7 @@ explore.json
 plan.json
 live-setup.json
 
+.profile-repro/
+banner-check.png
+banners-orig-backup.png
+live-repro.out
