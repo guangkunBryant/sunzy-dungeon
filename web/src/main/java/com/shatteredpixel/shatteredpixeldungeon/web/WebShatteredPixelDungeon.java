@@ -17,8 +17,10 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
+import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.levels.features.LevelTransition;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTerrainTilemap;
 import com.watabou.noosa.Game;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.FileUtils;
@@ -34,8 +36,11 @@ import java.io.IOException;
 public class WebShatteredPixelDungeon extends ShatteredPixelDungeon {
 
 	private static final long AUTO_SAVE_INTERVAL_MS = 3_000;
+	private static final long DEBUG_DUMP_INTERVAL_MS = 10_000;
 
 	private long nextAutoSaveAt;
+	private long nextDebugDumpAt;
+	private boolean healedOnce;
 
 	public WebShatteredPixelDungeon(PlatformSupport platform) {
 		super(platform);
@@ -57,6 +62,36 @@ public class WebShatteredPixelDungeon extends ShatteredPixelDungeon {
 	@Override
 	public void render() {
 		super.render();
+
+		//P11(web): periodic render-state dump (map|data|needsRender per non-wall cell
+		// around the hero) so the test harness can diff CPU tile state against saved
+		// terrain when investigating visual corruption reports.
+		if (Game.realTime >= nextDebugDumpAt
+				&& Game.scene() instanceof GameScene
+				&& Dungeon.level != null
+				&& Dungeon.hero != null) {
+			nextDebugDumpAt = Game.realTime + DEBUG_DUMP_INTERVAL_MS;
+			int[] data = DungeonTerrainTilemap.debugData();
+			if (data != null) {
+				int[] map = Dungeon.level.map;
+				int w = Dungeon.level.width();
+				int h = Dungeon.level.height();
+				int hero = Dungeon.hero.pos;
+				int hx = hero % w, hy = hero / w;
+				StringBuilder sb = new StringBuilder("DBGDUMP");
+				for (int y = Math.max(0, hy - 8); y <= Math.min(h - 1, hy + 8); y++) {
+					for (int x = Math.max(0, hx - 14); x <= Math.min(w - 1, hx + 14); x++) {
+						int p = y * w + x;
+						if (map[p] != 4) {
+							sb.append(' ').append(x).append(',').append(y)
+									.append(':').append(map[p]).append('|').append(data[p])
+									.append('|').append(DungeonTerrainTilemap.debugNeedsRender(p) ? 1 : 0);
+						}
+					}
+				}
+				Gdx.app.log("DBGDUMP", sb.toString());
+			}
+		}
 
 		// Browser storage writes issued during pagehide may be cancelled. Save
 		// stable turns periodically so refreshing loses at most a few seconds.

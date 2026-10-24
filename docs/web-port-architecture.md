@@ -161,6 +161,8 @@ Method: apply only this list. **Everything else in the glassesmonkey diff is ups
 | P8 | `core/.../scenes/GameScene.java` | Actor-thread lifecycle for TeaVM semantics: (a) `destroy()`-path: `if (isWeb()) endActorThread(); else if (!waitForActorThread(4500,true)) ...` (the 4.5s blocking wait hangs under TeaVM) **[PROVEN]**; (b) replace `actorThread.interrupt()` with `synchronized (actorThread) { actorThread.notify(); }` when web (TeaVM throws JavaError interrupting a thread during monitor unwinding) **[PROVEN]**; (c) guards on `Actor.processing()` around `waitForActorThread(500,false)` **[PROVEN]** | **hard** (concurrency semantics; highest reasoning burden) — but the diff is ~20 lines and proven | No. |
 | P9 | *(not core — build-time)* `BuildWeb.patchTeaVmOutput()` | Post-compile patch of generated `webapp/app.js`: (1) TeaVM's `$rt_simpleConstructors` table can list constructors whose bodies were eliminated — alias them to the nearest defined superclass constructor (fork's ~130-line resolver, **[PROVEN]**, runs only when aliases are needed); (2) null-guard the second of the two `pagehide`/`visibilitychange` listeners backend-web registers (double-pause crash on reload) **[PROVEN]**; (3) inject `<link rel="icon" href="data:,">` into `index.html` to silence favicon 404s. | **moderate** — **brittle**: regexes over generated JS; **pin TeaVM exactly 1.5.5** and `node --check` after every build (CI gate) | Yes — this is outside core by design. |
 | P10 | `SPD-classes/.../glwrap/Attribute.java`, `noosa/NoosaScript.java`, `noosa/TextInput.java` | WebGL (GLES2) cannot read client-side vertex/index arrays: (a) `Attribute.vertexPointer(FloatBuffer)` — backend Buffer overload throws `GdxRuntimeException`, killing the rAF loop on first `effects.Flare`/`CircleArc` draw (HUD, visible right after restoring a save); web path uploads the client FloatBuffer to a lazy scratch ARRAY_BUFFER and uses the buffer-offset `glVertexAttribPointer` (offset = caller position × 4); (b) `NoosaScript.drawElements(FloatBuffer, ShortBuffer, int)` — after `Quad.releaseIndices()` the backend turns the client ShortBuffer into `gl.drawElements` against an unbound ELEMENT_ARRAY_BUFFER → GL error on every draw (Chromium: "WebGL: too many errors"); web path uploads indices to a scratch ELEMENT_ARRAY_BUFFER and draws with byte-offset 0; (c) gate `TextInput`'s `SpriteBatch.overrideVertexType = VertexArray` behind `!isWeb()` (VertexArray uses path (a)). All `DeviceCompat.isWeb()` gated **[PROVEN]**: restore flow renders with 0 GL errors, loop alive (4×1s screenshots differ) | **easy** | No. |
+| P11 | `core/.../tiles/DungeonTerrainTilemap.java` (read-only debug accessors), `web/.../web/WebShatteredPixelDungeon.java` (10s-throttled console dump) | Live render-state debug bridge: `debugData()` / `debugNeedsRender(pos)` expose the tilemap's CPU state; the web main class logs `DBGDUMP x,y:map\|data\|needsRender` for non-wall cells around the hero every 10s. This is what cracked the §5.5 incident (CPU `data[]` clean while the screen showed water ⇒ GPU-side). Dev-only, negligible cost. | **trivial** | Additive accessors only. |
+| P12 | `SPD-classes/.../glwrap/Vertexbuffer.java` | **Supersedes P2's web partial-upload branch.** The gdx-teavm 1.5.5 bridge's `glBufferSubData` ignores the `size` argument and converts the *whole* Java buffer to a typed array (`TypedArrays.getTypedArray` → `Float32Array.fromJavaBuffer`, which need not respect position/limit). Partial uploads (`updateStart != 0`) are therefore unreliable and were observed garbling the terrain VBO far beyond the dirty range (§5.5). On `isWeb()`, do a full `glBufferData(position(0), limit*4, DYNAMIC_DRAW)` instead — the path verified correct at scene creation. ~128KB per map change (door open / grass trample), negligible. Desktop keeps the original partial path. **[PROVEN]** 3/3 corridor transits clean after fix (was 2/2 corrupt before). | **easy** | No — same call sites as P2. |
 
 ### 2.2 Implicitly covered (no patch needed, verify at M2)
 
@@ -385,22 +387,44 @@ Everything marked **[PROVEN]** was verified from the glassesmonkey repository (c
 - Fork clone: `%TEMP%\opencode\spdw` (web, SPD-classes/src, core/src)
 - gdx-teavm docs (master): https://github.com/xpenatan/gdx-teavm/blob/master/docs/usage.md — **note**: reflects 1.6+ plugin; 1.5.5 = manual builder only
 
-### 5.5 Incident: "walked areas render as water" (user report, 2026-10-22)
+### 5.5 Incident: "walked areas render as water" (user report 2026-10-22, **ROOT-CAUSED & FIXED 2026-10-24**)
 
-Investigation outcome �� **no data or rendering defect reproduced**:
+**Resolution:** a real, reproducible GPU-side defect — `Vertexbuffer` partial uploads via the
+gdx-teavm bridge corrupt the terrain tilemap's VBO far beyond the dirty range. Fixed by P12
+(web partial uploads -> full `glBufferData`). Saved terrain data was never affected.
 
-- Saved `Level.map` histograms are identical before/after a 17-tile walk (BFS route to (30,34),
-  depth 3): `{0:110,1:169,2:20,4:1363,...}` cell-for-cell. Walking does not mutate terrain.
-- Teal regions on screenshots match saved terrain exactly: CHASM cross + wooden walkway
-  (`EMPTY_SP`) + `WATER` pools are **legitimate v4.0.2 bridge/connection rooms**; CHASM can
-  generate on sewers floors via bridge rooms (grep: painters set `Terrain.CHASM` unconditionally).
-- Reload A/B (same corridor, before vs after `location.reload()` + resume): renderings identical
-  and consistent with save data. The original suspect session died with a server restart, so a
-  transient GPU/buffer corruption in *that* instance cannot be fully excluded.
-- Follow-up if user reproduces: F5 first (rebuilds tilemap buffers); if it persists, send a
-  screenshot + depth. Fresh-profile StartScene hero pane rendered black once (unreproduced,
-  no console errors) �� watch for recurrence.
+Phase 1 (2026-10-22, inconclusive — kept for the method):
+- Saved `Level.map` histograms identical before/after a 17-tile walk: `{0:110,1:169,...}`.
+  Walking does not mutate terrain — the data layer was never the problem.
+- Teal regions partly legitimate: CHASM cross + wooden walkway + WATER pools are real
+  v4.0.2 bridge/connection rooms; but *some* teal was the bug (see phase 2), misread at
+  zoomed-out scale as "water patch per data".
 
+Phase 2 (2026-10-24, reproduced and root-caused):
+- Repro: continuous session, depth 3, walk the (18,32)->(30,34) corridor **through the door**
+  and walk back; the bridge-room interior + corridor render as scrolling water (the
+  under-tiles `SkinnedBlock` showing through) while walls (separate tilemap/buffer) stay
+  correct. Persists until reload.
+- P11 debug bridge (`DBGDUMP x,y:map|data|needsRender` every 10s): CPU-side `data[]` and
+  `needsRender` stay **correct** in the corrupted state => corruption is GPU-side.
+- The only GPU write to the terrain VBO during play is the partial upload triggered by map
+  changes (the corridor door opening). Bridge inspection (javap on backend-web 1.5.5):
+  `WebGL20.glBufferSubData(target, offset, size, data)` **ignores `size`** and uploads the
+  whole `TypedArrays.getTypedArray(data)` view; `Float32Array.fromJavaBuffer` need not
+  respect position/limit. P2's scratch-range workaround is not safe in this environment.
+- One-shot heal probe (periodic full `GameScene.updateMap()`) masked the corruption in
+  screenshots => confirms a full re-upload repairs the visuals (CPU data valid throughout).
+- **Fix (P12):** on web, replace partial uploads with a full `glBufferData` in
+  `Vertexbuffer.updateGLData()`; desktop path untouched.
+- Verify: 3 corridor transits (2 door opens per round trip) with the heal probe removed —
+  3/3 clean (`tests/screenshots/f0..f2-transit*.png`), where before the fix the 1st transit
+  already garbled the room (`d1-after-walk.png`).
+
+Stale notes from phase 1 (still useful):
+- Follow-up protocol if the user reports it again post-fix: F5 first; if it persists, send a
+  screenshot + depth + browser/GPU (the P11 `DBGDUMP` lines in the console are gold).
+- Fresh-profile StartScene hero pane rendered black once (unreproduced, no console errors)
+  — watch for recurrence.
 ### 5.6 Rebrand (reskin stage 1, 2026-10-22)
 
 - `core/assets/interfaces/banners.png`: TITLE_PORT / TITLE_LAND text regions redrawn as

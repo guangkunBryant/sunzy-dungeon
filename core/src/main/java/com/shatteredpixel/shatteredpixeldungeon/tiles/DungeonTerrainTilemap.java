@@ -31,6 +31,18 @@ public class DungeonTerrainTilemap extends DungeonTilemap {
 
 	static DungeonTerrainTilemap instance;
 
+	//P11(web): read-only debug bridge for live render-state dumps (see WebShatteredPixelDungeon)
+	public static int[] debugData() {
+		DungeonTerrainTilemap tilemap = instance;
+		return tilemap == null ? null : tilemap.data;
+	}
+
+	//P11(web): expose per-cell render decision for live debugging
+	public static boolean debugNeedsRender(int pos) {
+		DungeonTerrainTilemap tilemap = instance;
+		return tilemap != null && tilemap.needsRender(pos);
+	}
+
 	public DungeonTerrainTilemap(){
 		super(Dungeon.level.tilesTex());
 

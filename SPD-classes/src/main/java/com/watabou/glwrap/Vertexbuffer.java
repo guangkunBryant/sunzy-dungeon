@@ -83,21 +83,18 @@ public class Vertexbuffer {
 			((Buffer)vertices).position(0);
 			Gdx.gl.glBufferData(Gdx.gl.GL_ARRAY_BUFFER, vertices.limit()*4, vertices, Gdx.gl.GL_DYNAMIC_DRAW);
 		} else {
-			int length = updateEnd - updateStart;
 			if (DeviceCompat.isWeb()) {
-				// TeaVM's WebGL bridge uploads the entire typed-array view, so give it a
-				// buffer that contains exactly the dirty range for partial updates.
-				int position = vertices.position();
-				int limit = vertices.limit();
-				FloatBuffer update = BufferUtils.newFloatBuffer(length);
-				((Buffer)vertices).position(updateStart);
-				((Buffer)vertices).limit(updateEnd);
-				update.put(vertices);
-				((Buffer)update).position(0);
-				((Buffer)vertices).limit(limit);
-				((Buffer)vertices).position(position);
-				Gdx.gl.glBufferSubData(Gdx.gl.GL_ARRAY_BUFFER, updateStart*4, length*4, update);
+				//P12(web): TeaVM's WebGL bridge ignores glBufferSubData's size argument and
+				//converts the whole Java buffer to a typed array, and Float32Array views
+				//created from Java buffers may not respect position/limit. Partial uploads
+				//are therefore unreliable (a door opening on one floor could garble unrelated
+				//cells on the GPU). Re-upload the whole buffer via glBufferData instead, the
+				//path verified correct at scene creation. A full terrain upload is ~128KB and
+				//only happens on map changes, so the cost is negligible.
+				((Buffer)vertices).position(0);
+				Gdx.gl.glBufferData(Gdx.gl.GL_ARRAY_BUFFER, vertices.limit()*4, vertices, Gdx.gl.GL_DYNAMIC_DRAW);
 			} else {
+				int length = updateEnd - updateStart;
 				((Buffer)vertices).position(updateStart);
 				Gdx.gl.glBufferSubData(Gdx.gl.GL_ARRAY_BUFFER, updateStart*4, length*4, vertices);
 			}
