@@ -195,7 +195,10 @@ public class TitleScene extends PixelScene {
 
 		btnNews = new NewsButton(GREY_TR, Messages.get(this, "news"));
 		btnNews.icon(Icons.get(Icons.NEWS));
-		add(btnNews);
+		//news entry is hidden entirely when no news service is available (e.g. browser port / fork builds)
+		if (News.supportsNews()) {
+			add(btnNews);
+		}
 
 		btnChanges = new ChangesButton(GREY_TR, Messages.get(this, "changes"));
 		btnChanges.icon(Icons.get(Icons.CHANGES));
