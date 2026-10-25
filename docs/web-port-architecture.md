@@ -425,11 +425,52 @@ Stale notes from phase 1 (still useful):
   screenshot + depth + browser/GPU (the P11 `DBGDUMP` lines in the console are gold).
 - Fresh-profile StartScene hero pane rendered black once (unreproduced, no console errors)
   — watch for recurrence.
-### 5.6 Rebrand (reskin stage 1, 2026-10-22)
+### 5.6 Rebrand program ("sunzy", started 2026-10-22, industrialized 2026-10-25)
 
-- `core/assets/interfaces/banners.png`: TITLE_PORT / TITLE_LAND text regions redrawn as
-  pixel-art "SUNZY" (gold gradient + dark outline); glow regions re-synced (green shimmer copy);
-  all other sprites untouched. Generator: `tests/rebrand-banner.mjs` (backup: banners-orig-backup.png).
-- `BuildWeb.setHtmlTitle("sunzy")` -> browser tab title.
-- Storage keys (IndexedDB `shattered-pixel-dungeon`, prefs) deliberately unchanged to keep saves.
-- GPL-3.0 compliance: Credits/About scenes and license headers preserved.
+Legal frame (user-confirmed): **all player-visible presentation becomes sunzy's own
+pixel style; GPL-3.0 license, source copyright headers, and the Credits/About author
+entries stay verbatim.** Package/class names never change (saves + reflection).
+
+Style identity: deep indigo `#1A2238` base, amber-gold `#FFC84A` highlight, jade-green
+`#3DDC84` accent, dark outline `#12101F`, "lit-from-above" two-tone shading. Overall
+look: darker, sharper, more saturated than upstream's brown-wood UI.
+
+Infrastructure (`tests/rebrand/`):
+- `lib.mjs` — shared pixel pipeline: playwright-chromium canvas codec (sharp is absent),
+  ImageData in/out, hueShift/quantize/outline/shadeTopBottom, uniform film-grid
+  `cells()/compose()`, `scanSpriteFilms()` (extracts `TextureFilm(texture, W, H)` per
+  `*Sprite.java`). PNG dims are **always** preserved; frame grids are byte-exact.
+- Generator pattern (proven): snapshot originals to `.backup-<name>/` on first run,
+  always transform FROM the snapshot (idempotent re-runs), numeric assertions on
+  dims/alpha/residue, then write straight into `core/src/main/assets/` (git is the
+  rollback).
+- Agents self-check numerically (dims, alpha ±0, hue stats); coordinator does the
+  visual pass + in-game screenshots before each commit. (One agent died reading an
+  image via the read tool — "content unsafe" filter; numeric-first checking added.)
+
+Done:
+- banners.png SUNZY title + tab title (earlier).
+- Brand sweep (commit 47be11f): 10 whitelisted message keys x23 languages now say
+  sunzy; news + update services disabled (`supportsNews/Updates()` false, title button
+  hidden). Support/Patreon entry reworded across 23 languages as "support the
+  original developer" (e53ef2d) — attribution-friendly, Patreon URL kept.
+- Batch 1 (55526cb): UI chrome/status/toolbar/icons to indigo+gold; sewers terrain
+  purple-grey rock + emerald water/grass; 13 sewers mobs per-mob hue + outline.
+- Batch 2 (653c892): 6 hero classes + avatars per-class hue; region tiles (prison/
+  caves/crystal/gnoll/city/halls) with per-region palettes; items atlas with potion
+  identity colors strictly untouched.
+- Batch 3 (66ab78d): all remaining mobs/NPCs/bosses (46 files, incl. ratking band
+  rows and shared-sheet specials); splash paintings + title background remapped to
+  sunzy bands; effects hue-shifted (alpha byte-exact).
+- Batch 4 (1d6652d): prop/quest sprites (amulet/pylon/hawk/etc.), crystal+gnoll
+  custom_tiles, talent_icons, surface strip. lib.mjs rgb2hsl pure-red wrap fixed.
+
+All batches verified in-game (title, fresh start, corridor transits, combat kill,
+death flow) with zero console errors; `:web:webBuild` green throughout. Known
+polish candidates: title splash noise (band curve could be smoother), bitmap
+fonts still upstream, music/sfx unchanged (out of scope for now).
+
+Verification gates per batch: `gradlew :desktop:classes :web:webBuild`, live harness
+screenshots (title -> start -> new game -> walk/fight -> depth transitions), PNG
+dims/alpha byte-exact, then commit. Final: full M1-M5 regression, then push public
+repo `github.com/guangkunBryant/sunzy-dungeon` (GPL-3.0).
